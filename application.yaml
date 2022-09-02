@@ -7,7 +7,7 @@ spec:
   project: default
 
   source:
-    repoURL: https://BMustafa97@bitbucket.org/BMustafa97/kube-argocd.git
+    repoURL: https://github.com/BMustafa97/argocd.git
     targetRevision: HEAD
     path: dev
   destination: 
