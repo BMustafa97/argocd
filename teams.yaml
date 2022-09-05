@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+data:
+  service.teams: |
+    recipientUrls: 
+      channelName: https://mabeval.webhook.office.com/webhookb2/68a1998f-95bc-4120-a246-a55dce9de789@dfa7d1a7-39b7-4382-ae1c-7ff24c022651/IncomingWebhook/253c6d6329e04ec9b4dacf952e42bb51/83179d68-ec88-4ed4-a695-2012015cbab6
+
+---
+kind: Application
+metadata:
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.teams: OpsOutputTest
