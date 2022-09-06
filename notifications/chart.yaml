@@ -1,0 +1,190 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-notifications                                
+  namespace: argocd                                         
+spec:
+  destination:
+    namespace: argocd                                       
+    server: https://kubernetes.default.svc                  
+  project: default
+  source:
+    chart: argocd-notifications
+    repoURL: https://argoproj.github.io/argo-helm
+    targetRevision: 1.7.0
+    helm:
+      values: |
+        notifiers:                                           
+          service.teams: |                                   
+            recipientUrls:
+              General: $channel-teams-url              
+        secret:
+          create: false
+          name: msteams-webhook-url                          
+        templates:                                           
+          template.app-sync-status-unknown: |                
+            teams:
+              facts: |
+                [{
+                  "name": "Sync Status",
+                  "value": "{{.app.status.sync.status}}"
+                },
+                {
+                  "name": "Repository",
+                  "value": "{{.app.spec.source.repoURL}}"
+                }
+                {{range $index, $c := .app.status.conditions}}
+                  {{if not $index}},{{end}}
+                  {{if $index}},{{end}}
+                  {
+                    "name": "{{$c.type}}",
+                    "value": "{{$c.message}}"
+                  }
+                {{end}}
+                ]
+              potentialAction: |-
+                [{
+                  "@type":"OpenUri",
+                  "name":"Open Application",
+                  "targets":[{
+                    "os":"default",
+                    "uri":"{{.context.argocdUrl}}/applications/{{.app.metadata.name}}"
+                  }]
+                },
+                {
+                  "@type":"OpenUri",
+                  "name":"Open Repository",
+                  "targets":[{
+                    "os":"default",
+                    "uri":"{{.app.spec.source.repoURL | call .repo.RepoURLToHTTPS}}"
+                  }]
+                }]
+              themeColor: '#FF0000'
+              title: Application {{.app.metadata.name}} sync status is 'Unknown'
+              text: Application {{.app.metadata.name}} has sync status as 'Unknown' at {{.app.status.operationState.finishedAt}}.
+              summary: "{{.app.metadata.name}} has sync status as 'Unknown'"
+          template.app-health-degraded: |                                    
+            teams:
+              facts: |
+                [{
+                  "name": "Health Status",
+                  "value": "{{.app.status.health.status}}"
+                },
+                {
+                  "name": "Repository",
+                  "value": "{{.app.spec.source.repoURL}}"
+                }
+                {{range $index, $c := .app.status.conditions}}
+                  {{if not $index}},{{end}}
+                  {{if $index}},{{end}}
+                  {
+                    "name": "{{$c.type}}",
+                    "value": "{{$c.message}}"
+                  }
+                {{end}}
+                ]
+              potentialAction: |
+                [{
+                  "@type":"OpenUri",
+                  "name":"Open Application",
+                  "targets":[{
+                    "os":"default",
+                    "uri":"{{.context.argocdUrl}}/applications/{{.app.metadata.name}}"
+                  }]
+                },
+                {
+                  "@type":"OpenUri",
+                  "name":"Open Repository",
+                  "targets":[{
+                    "os":"default",
+                    "uri":"{{.app.spec.source.repoURL | call .repo.RepoURLToHTTPS}}"
+                  }]
+                }]
+              themeColor: '#FF0000'
+              title: Application {{.app.metadata.name}} has degraded.
+              text: Application {{.app.metadata.name}} has status as 'degraded' at {{.app.status.operationState.finishedAt}}.
+              summary: "{{.app.metadata.name}} has status as 'degraded'"
+          template.app-sync-failed: |                                      
+            teams:
+              facts: |
+                [{
+                  "name": "Sync Status",
+                  "value": "{{.app.status.sync.status}}"
+                },
+                {
+                  "name": "Failed at",
+                  "value": "{{.app.status.operationState.finishedAt}}"
+                },
+                {
+                  "name": "Repository",
+                  "value": "{{.app.spec.source.repoURL}}"
+                }
+                {{range $index, $c := .app.status.conditions}}
+                  {{if not $index}},{{end}}
+                  {{if $index}},{{end}}
+                  {
+                    "name": "{{$c.type}}",
+                    "value": "{{$c.message}}"
+                  }
+                {{end}}
+                ]
+              potentialAction: |-
+                [{
+                  "@type":"OpenUri",
+                  "name":"Open Operation",
+                  "targets":[{
+                    "os":"default",
+                    "uri":"{{.context.argocdUrl}}/applications/{{.app.metadata.name}}?operation=true"
+                  }]
+                },
+                {
+                  "@type":"OpenUri",
+                  "name":"Open Repository",
+                  "targets":[{
+                    "os":"default",
+                    "uri":"{{.app.spec.source.repoURL | call .repo.RepoURLToHTTPS}}"
+                  }]
+                }]
+              themeColor: '#FF0000'
+              title: Failed to sync application {{.app.metadata.name}}.
+              text: Application {{.app.metadata.name}} has sync failed at {{.app.status.operationState.finishedAt}}.
+              summary: "{{.app.metadata.name}} has sync failed"
+        triggers:                                                   
+          trigger.on-sync-status-unknown: |                        
+            - description: Application status is 'Unknown'
+              oncePer: app.metadata.name
+              send:
+              - app-sync-status-unknown
+              when: app.status.sync.status == 'Unknown'
+          trigger.on-health-degraded: |                             
+            - description: Application has degraded
+              oncePer: app.metadata.name
+              send:
+              - app-health-degraded
+              when: app.status.health.status == 'Degraded'
+          trigger.on-sync-failed: |                                 
+            - description: Application syncing has failed
+              oncePer: app.metadata.name
+              send:
+              - app-sync-failed
+              when: app.status.operationState.phase in ['Error', 'Failed']
+        subscriptions:                                             
+          - recipients:
+              - teams:General                                
+            triggers:
+              - on-sync-status-unknown
+              - on-health-degraded
+              - on-sync-failed
+        metrics:                                                   
+          enabled: true                                            
+          serviceMonitor: 
+            enabled: true                                          
+            additionalLabels:
+              release: prometheus
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
