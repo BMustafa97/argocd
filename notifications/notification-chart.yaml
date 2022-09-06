@@ -17,7 +17,7 @@ spec:
         notifiers:                                           # Notifier defines the different notification-services to be used for routing notifications
           service.teams: |                                   # To use teams as notification service for ArgoCD sync notifications
             recipientUrls:
-              general: $channel-teams-url              # $channel-teams-url is the webhook url passed from the secret
+              General: $channel-teams-url              # $channel-teams-url is the webhook url passed from the secret
         secret:
           create: false
           name: msteams-webhook-url                          # Name of the secret created via sealed-secrets
@@ -170,7 +170,7 @@ spec:
               when: app.status.operationState.phase in ['Error', 'Failed']
         subscriptions:                                             # Subscription defines which notifier to be used based on the triggers
           - recipients:
-              - teams:general                                # To use MS Teams channel as the notifier
+              - teams:General                                # To use MS Teams channel as the notifier
             triggers:
               - on-sync-status-unknown
               - on-health-degraded
